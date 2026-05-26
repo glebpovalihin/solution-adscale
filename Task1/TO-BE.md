@@ -22,49 +22,43 @@
 
 ## 3. Системы
 
-### 3.1 AD System — Таргетинг
-- **Сервис**: Ad Server
-- **БД**: PostgreSQL — кампании, таргетинг
-- **Кеш**: Redis — кеширование кампаний и таргетинга
-- **Характеристики**: read-heavy, кеширует данные в Redis, масштабируется независимо
-
-### 3.2 Auction System — Аукцион
-- **Сервис**: Auction Service
+### 3.1 RTB System — Аукцион
+- **Сервис**: RTB Service
 - **БД**:
-  - PostgreSQL (Primary) — ставки, правила, конфигурации
-  - PostgreSQL (Read Replica) — чтение при cache miss
-- **Кеш**: Redis — запись/чтение ставок кандидатов, конфигураций и правил
-- **Характеристики**: наиболее latency-чувствительный сервис (critical path). Свой Redis-кеш и своя PostgreSQL для изоляции от блокировок. Горизонтальное масштабирование.
+  - PostgreSQL (Primary) — кампании, таргетинг, ставки, правила, конфигурации
+  - PostgreSQL (Read Replica) - чтение при cache miss
+- **Кеш**: Redis — запись/чтение кампаний, таргетинга, ставок кандидатов, конфигураций и правил
+- **Характеристики**: read-heavy, кеширует данные в Redis, масштабируется независимо. Наиболее latency-чувствительный сервис (critical path). Свой Redis-кеш и своя PostgreSQL для изоляции от блокировок. Горизонтальное масштабирование.
 
-### 3.3 Delivery System — Доставка
+### 3.2 Delivery System — Доставка
 - **Сервис**: Delivery Service
 - **БД**: PostgreSQL — кампании, креативы
 - **Кеш**: Redis — кампании, креативы
 - **Характеристики**: минимальная логика (формирование HTML/JS-разметки баннера), максимальная скорость выдачи на основе чтения из кеша
 
-### 3.4 Campaign System — Кампании
+### 3.3 Campaign System — Кампании
 - **Сервис**: Campaign Service
 - **БД**:
   - PostgreSQL (Primary) — рекламные кампании, ставки, таргетинг (запись)
   - PostgreSQL (Read Replica) — чтение
 - **Характеристики**: Не влияет на чувствительный ко времени ответа флоу аукциона. Чтение с read replica для снижения нагрузки на master.
 
-### 3.5 Financial System — Финансы
+### 3.4 Financial System — Финансы
 - **Сервис**: Financial Service
 - **БД**: PostgreSQL — счета, транзакции, балансы, аудит
 - **Характеристики**: ACID-транзакции, асинхронное получение событий списания
 
-### 3.6 Statistic System — Статистика
+### 3.5 Statistic System — Статистика
 - **Сервис**: Statistic Service
 - **БД**: ClickHouse — сырые события: клики, показы (time-series)
 - **Характеристики**: write-heavy, полностью асинхронный. Минимальное влияние на latency аукциона.
 
-### 3.7 Analytics System — Аналитика
+### 3.6 Analytics System — Аналитика
 - **Сервис**: Analytics Service
 - **БД**: ClickHouse — хранилище событий для аналитики
 - **Характеристики**: read-heavy, асинхронный. Свой ClickHouse (не нагружает OLTP-хранилища).
 
-### 3.8 Advertiser System — Пользовательский интерфейс
+### 3.7 Advertiser System — Пользовательский интерфейс
 - **Сервис**: Advertiser Dashboard
 - **БД**: отсутствует
 - **Характеристики**: клиент предоставляющий user friendly интерфейс для рекламодателей.
@@ -74,9 +68,9 @@ Kafka является центральной шиной для асинхрон
 
 | Топик | Producer | Consumer(s) | Назначение |
 |---|---|---|---|
-| `ставки` | Campaign Service | Auction Service | Обновление ставок |
-| `таргетинг` | Campaign Service | Ad Server | Обновление таргетинга |
-| `кампании` | Campaign Service | Ad Server, Delivery Service | Обновление кампаний |
+| `ставки` | Campaign Service | RTB Service | Обновление ставок |
+| `таргетинг` | Campaign Service | RTB Service | Обновление таргетинга |
+| `кампании` | Campaign Service | RTB Service, Delivery Service | Обновление кампаний |
 | `отображения рекламы` | Statistic Service | Analytics Service, Financial Service | События показов |
 | `клики на рекламу` | Statistic Service | Analytics Service, Financial Service | События кликов |
 
@@ -94,12 +88,12 @@ Kafka является центральной шиной для асинхрон
 
 ### 5.2 Кеширование (Redis)
 
-Redis добавлен перед БД на critical path (Ad Server, Auction Service, Delivery Service):
+Redis добавлен перед БД на critical path (RTB Service, Delivery Service):
 - Снижение latency чтения
 - Разгрузка PostgreSQL
 
 ### 5.3 Read Replicas
-PostgreSQL Read Replicas используются в Auction Service и Campaign Service для:
+PostgreSQL Read Replicas используются в RTB Service и Campaign Service для:
 - Разгрузки master при чтении
 - Обеспечения отказоустойчивости
 
